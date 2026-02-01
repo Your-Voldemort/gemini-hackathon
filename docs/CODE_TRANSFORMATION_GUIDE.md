@@ -1,6 +1,6 @@
 # LegalMind: Code Transformation Guide
 
-This document provides the exact code changes needed to transform RiskWise into LegalMind.
+This document provides the exact code changes needed to transform the legacy procurement system into LegalMind.
 
 ---
 
