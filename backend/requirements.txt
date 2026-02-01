@@ -1,17 +1,36 @@
+# =============================================================================
+# LegalMind Requirements
+# Google Cloud / Gemini API Stack
+# =============================================================================
+
+# Web Framework
 fastapi>=0.104.1
 uvicorn>=0.24.0
-semantic-kernel>=0.4.0
-python-dotenv>=1.0.0
-pyodbc>=4.0.39
-pandas>=2.1.1
-nest-asyncio>=1.5.8
-azure-identity>=1.14.1
-azure-ai-projects==1.0.0b10
-streamlit>=1.28.0
-requests>=2.31.0
-plotly>=5.13.0
-azure-storage-blob>=12.19.0
-md2docx-python>=1.0.0
-Spire.Doc.Free
+python-multipart>=0.0.6
+
+# Google AI & Cloud Services
+google-generativeai>=0.8.0
+google-cloud-firestore>=2.16.0
+google-cloud-storage>=2.14.0
+google-auth>=2.25.0
+
+# PDF Processing
+PyPDF2>=3.0.1
+pdfplumber>=0.10.3
+
+# Document Generation
 python-docx>=0.8.11
 markdown>=3.5.1
+reportlab>=4.0.0
+
+# Utilities
+python-dotenv>=1.0.0
+pandas>=2.1.1
+nest-asyncio>=1.5.8
+requests>=2.31.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# Development
+streamlit>=1.28.0
+plotly>=5.13.0
