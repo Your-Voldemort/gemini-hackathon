@@ -1,6 +1,6 @@
 # LegalMind: Frontend Changes Guide
 
-This document details all frontend changes required to transform RiskWise into LegalMind.
+This document details all frontend changes required to transform the legacy procurement system into LegalMind.
 
 ---
 
