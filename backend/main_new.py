@@ -5,9 +5,11 @@ Run with: python main_new.py
 
 import uvicorn
 from dotenv import load_dotenv
+import os
 
-# Load environment variables
-load_dotenv()
+# Load environment variables from .env.local first, then .env
+load_dotenv(".env.local")
+load_dotenv(".env")
 
 
 def main():
