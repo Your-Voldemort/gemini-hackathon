@@ -13,6 +13,51 @@ from functools import lru_cache
 from config.settings import get_settings, get_gemini_api_key
 
 
+def _convert_json_schema_to_gemini(schema: Dict[str, Any]) -> Dict[str, Any]:
+    """Convert JSON Schema format to Gemini's expected schema format.
+    
+    Args:
+        schema: JSON Schema dict
+        
+    Returns:
+        Gemini-compatible schema dict
+    """
+    if not isinstance(schema, dict):
+        return schema
+    
+    result = {}
+    
+    # Convert type field from string to Type enum
+    if "type" in schema:
+        type_str = schema["type"]
+        # Map JSON Schema types to Gemini Type enum values
+        type_mapping = {
+            "object": "OBJECT",
+            "string": "STRING",
+            "number": "NUMBER",
+            "integer": "INTEGER",
+            "boolean": "BOOLEAN",
+            "array": "ARRAY",
+        }
+        result["type_"] = type_mapping.get(type_str, "STRING")
+    
+    # Copy other fields, converting recursively
+    for key, value in schema.items():
+        if key == "type":
+            continue  # Already handled
+        elif key == "properties" and isinstance(value, dict):
+            result["properties"] = {
+                k: _convert_json_schema_to_gemini(v)
+                for k, v in value.items()
+            }
+        elif key == "items" and isinstance(value, dict):
+            result["items"] = _convert_json_schema_to_gemini(value)
+        elif key in ["description", "enum", "required", "format"]:
+            result[key] = value
+    
+    return result
+
+
 class GeminiService:
     """Service for interacting with the Gemini API."""
     
@@ -329,6 +374,201 @@ class GeminiService:
             pass
         
         return usage
+    
+    async def generate_with_tools(
+        self,
+        prompt: str,
+        system_instruction: Optional[str] = None,
+        tools: Optional[List[Dict]] = None,
+        use_search_grounding: bool = False,
+        temperature: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """Generate content with tool calling support.
+        
+        Args:
+            prompt: The user prompt
+            system_instruction: Optional system instruction
+            tools: Tool definitions (JSON Schema format)
+            use_search_grounding: Whether to enable search grounding
+            temperature: Optional temperature
+            
+        Returns:
+            Response with text, function_calls, and citations
+        """
+        try:
+            # Build generation config
+            gen_config = genai.GenerationConfig(
+                temperature=temperature if temperature is not None else 0.7,
+            )
+            
+            # Build model kwargs
+            model_kwargs = {
+                "model_name": self.settings.gemini_model,
+                "generation_config": gen_config,
+            }
+            
+            if system_instruction:
+                model_kwargs["system_instruction"] = system_instruction
+            
+            # Convert tools to Gemini format
+            model_tools = []
+            if tools:
+                for tool in tools:
+                    # Extract function declaration info
+                    func_decl = {
+                        "name": tool["name"],
+                        "description": tool["description"],
+                    }
+                    
+                    # Convert parameters from JSON Schema to Gemini format
+                    if "parameters" in tool:
+                        func_decl["parameters"] = _convert_json_schema_to_gemini(tool["parameters"])
+                    
+                    model_tools.append(func_decl)
+            
+            if use_search_grounding:
+                from google.generativeai.types import Tool
+                model_tools.append(Tool.from_google_search_retrieval())
+            
+            if model_tools:
+                model_kwargs["tools"] = model_tools
+            
+            model = genai.GenerativeModel(**model_kwargs)
+            
+            # Generate content
+            response = await asyncio.to_thread(
+                model.generate_content,
+                prompt
+            )
+            
+            # Extract function calls
+            function_calls = []
+            if response.candidates and response.candidates[0].content.parts:
+                for part in response.candidates[0].content.parts:
+                    if hasattr(part, 'function_call') and part.function_call:
+                        fc = part.function_call
+                        function_calls.append({
+                            "name": fc.name,
+                            "arguments": dict(fc.args) if fc.args else {},
+                        })
+            
+            # Extract text
+            text = response.text if hasattr(response, 'text') and response.text else ""
+            
+            # Extract citations
+            citations = self._extract_citations(response)
+            
+            return {
+                "text": text,
+                "function_calls": function_calls,
+                "citations": citations,
+                "_response": response,  # Store for continuation
+            }
+            
+        except Exception as e:
+            print(f"Error in generate_with_tools: {e}")
+            import traceback
+            traceback.print_exc()
+            return {
+                "text": f"Error: {str(e)}",
+                "function_calls": [],
+                "citations": [],
+            }
+    
+    async def continue_with_function_results(
+        self,
+        function_results: List[Dict[str, Any]],
+        system_instruction: Optional[str] = None,
+        tools: Optional[List[Dict]] = None,
+    ) -> Dict[str, Any]:
+        """Continue conversation with function call results.
+        
+        Args:
+            function_results: List of dicts with 'name' and 'result'
+            system_instruction: System instruction
+            tools: Tool definitions (JSON Schema format)
+            
+        Returns:
+            Response with text, function_calls, citations
+        """
+        try:
+            # Build generation config
+            gen_config = genai.GenerationConfig(temperature=0.7)
+            
+            # Build model
+            model_kwargs = {
+                "model_name": self.settings.gemini_model,
+                "generation_config": gen_config,
+            }
+            
+            if system_instruction:
+                model_kwargs["system_instruction"] = system_instruction
+            
+            # Convert tools to Gemini format
+            if tools:
+                model_tools = []
+                for tool in tools:
+                    func_decl = {
+                        "name": tool["name"],
+                        "description": tool["description"],
+                    }
+                    if "parameters" in tool:
+                        func_decl["parameters"] = _convert_json_schema_to_gemini(tool["parameters"])
+                    model_tools.append(func_decl)
+                model_kwargs["tools"] = model_tools
+            
+            model = genai.GenerativeModel(**model_kwargs)
+            
+            # Build function response parts
+            response_parts = []
+            for fr in function_results:
+                response_parts.append(
+                    genai.protos.Part(
+                        function_response=genai.protos.FunctionResponse(
+                            name=fr["name"],
+                            response={"result": json.dumps(fr["result"])}
+                        )
+                    )
+                )
+            
+            # Generate follow-up
+            response = await asyncio.to_thread(
+                model.generate_content,
+                response_parts
+            )
+            
+            # Extract function calls
+            function_calls = []
+            if response.candidates and response.candidates[0].content.parts:
+                for part in response.candidates[0].content.parts:
+                    if hasattr(part, 'function_call') and part.function_call:
+                        fc = part.function_call
+                        function_calls.append({
+                            "name": fc.name,
+                            "arguments": dict(fc.args) if fc.args else {},
+                        })
+            
+            # Extract text
+            text = response.text if hasattr(response, 'text') and response.text else ""
+            
+            # Extract citations
+            citations = self._extract_citations(response)
+            
+            return {
+                "text": text,
+                "function_calls": function_calls,
+                "citations": citations,
+            }
+            
+        except Exception as e:
+            print(f"Error in continue_with_function_results: {e}")
+            import traceback
+            traceback.print_exc()
+            return {
+                "text": f"Error: {str(e)}",
+                "function_calls": [],
+                "citations": [],
+            }
     
     async def generate_structured_output(
         self,
