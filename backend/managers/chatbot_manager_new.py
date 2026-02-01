@@ -95,9 +95,6 @@ class ChatbotManager:
         self.firestore = FirestoreService()
         self.storage = StorageService()
         
-        # Initialize thinking logger
-        self.thinking_logger = ThinkingLogger()
-        
         # Session management
         self.chat_sessions: Dict[str, Dict[str, Any]] = {}
         self._session_lock = asyncio.Lock()
