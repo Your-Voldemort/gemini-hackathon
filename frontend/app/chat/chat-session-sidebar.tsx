@@ -20,9 +20,12 @@ import { DropdownMenu } from '@/components/ui/dropdown-menu';
 import { DropdownMenuTrigger } from '@radix-ui/react-dropdown-menu';
 
 interface Session {
-  session_id: string;
-  user_query: string;
-  session_date: string;
+  id?: string;
+  session_id?: string;
+  status?: string;
+  contract_id?: string | null;
+  last_activity?: string | { seconds?: number; nanoseconds?: number } | null;
+  created_at?: string | { seconds?: number; nanoseconds?: number } | null;
 }
 
 interface ChatSessionSidebarProps {
@@ -33,6 +36,18 @@ interface ChatSessionSidebarProps {
 export function ChatSessionSidebar({ variant, onSessionSelect }: ChatSessionSidebarProps) {
   const [sessions, setSessions] = React.useState<Session[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
+
+  const formatTimestamp = (value?: Session['last_activity'] | Session['created_at']) => {
+    if (!value) return 'Unknown date';
+    if (typeof value === 'string') {
+      const parsed = new Date(value);
+      return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
+    }
+    if (typeof value === 'object' && value.seconds) {
+      return new Date(value.seconds * 1000).toLocaleString();
+    }
+    return 'Unknown date';
+  };
 
   React.useEffect(() => {
     const fetchSessions = async () => {
@@ -76,12 +91,17 @@ export function ChatSessionSidebar({ variant, onSessionSelect }: ChatSessionSide
             ) : sessions.length === 0 ? (
               <div className="px-4 py-2 text-sm text-muted-foreground">No sessions found</div>
             ) : (
-              sessions.map((session) => (
-                <SidebarMenuItem key={session.session_id} className="mb-2">
-                  <SidebarMenuButton onClick={() => handleSessionClick(session.session_id)}>
+              sessions.map((session) => {
+                const sessionId = session.session_id || session.id;
+                if (!sessionId) return null;
+                return (
+                <SidebarMenuItem key={sessionId} className="mb-2">
+                  <SidebarMenuButton onClick={() => handleSessionClick(sessionId)}>
                     <div className="flex flex-col my-2 !py-2 cursor-pointer">
-                      <p className="text-sm font-medium">{session.user_query}</p>
-                      <p className="text-xs text-muted-foreground">{session.session_date}</p>
+                      <p className="text-sm font-medium">Session {sessionId.slice(0, 8)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatTimestamp(session.last_activity || session.created_at)}
+                      </p>
                     </div>
                   </SidebarMenuButton>
 
@@ -104,7 +124,8 @@ export function ChatSessionSidebar({ variant, onSessionSelect }: ChatSessionSide
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </SidebarMenuItem>
-              ))
+                );
+              })
             )}
           </SidebarMenu>
         </SidebarGroup>
