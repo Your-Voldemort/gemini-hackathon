@@ -5,8 +5,6 @@ import { MountainIcon, Moon, Sun } from 'lucide-react';
 import { SearchForm } from './search-form';
 import { Button } from './ui/button';
 import { useTheme } from 'next-themes';
-import RiskWiseLogo from './riskwise_logo4.png';
-import Image from 'next/image';
 
 export function SiteHeader() {
   const { setTheme, theme } = useTheme();
@@ -22,7 +20,9 @@ export function SiteHeader() {
     <header className="sticky top-0 z-50 w-full border-b bg-background text-foreground">
       <div className="flex h-16 items-center justify-between mx-6">
         <Link href="/chat" className="flex items-center gap-2" prefetch={false}>
-          <Image src={RiskWiseLogo} alt="LegalMind Logo" className="w-10" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary font-semibold">
+            LM
+          </div>
           <span className="font-semibold text-primary">LegalMind</span>
         </Link>
         <nav className="hidden items-center gap-6 text-sm font-medium md:flex">
