@@ -83,6 +83,22 @@ from tools.logging_tools import (
 load_dotenv()
 
 
+class _SimpleThinkingLogger:
+    """Lightweight logger compatible with existing log_thinking calls."""
+
+    def __init__(self, firestore: FirestoreService):
+        self._firestore = firestore
+
+    async def log_thinking(self, session_id: str, agent_name: str, thinking: str):
+        """Persist a minimal thinking log entry."""
+        return await self._firestore.log_agent_thinking(
+            session_id=session_id,
+            agent_name=agent_name,
+            input_text=thinking,
+            output_text="",
+        )
+
+
 class ChatbotManager:
     """Manages interactive chat sessions with LegalMind agents."""
     
@@ -94,6 +110,9 @@ class ChatbotManager:
         self.gemini = GeminiService()
         self.firestore = FirestoreService()
         self.storage = StorageService()
+
+        # Thinking logger (lightweight)
+        self.thinking_logger = _SimpleThinkingLogger(self.firestore)
         
         # Session management
         self.chat_sessions: Dict[str, Dict[str, Any]] = {}
@@ -316,7 +335,13 @@ class ChatbotManager:
             "content": user_message,
             "timestamp": datetime.now().isoformat(),
         }
-        await self.firestore.add_message(session_id, user_msg_data)
+        await self.firestore.add_message(
+            session_id=session_id,
+            role=user_msg_data["role"],
+            content=user_msg_data["content"],
+            agent_name=user_msg_data.get("agent"),
+            citations=user_msg_data.get("citations"),
+        )
         session["messages"].append(user_msg_data)
         
         # Select agent based on query
@@ -367,7 +392,13 @@ class ChatbotManager:
             "timestamp": datetime.now().isoformat(),
             "citations": response.get("citations", []),
         }
-        await self.firestore.add_message(session_id, assistant_msg_data)
+        await self.firestore.add_message(
+            session_id=session_id,
+            role=assistant_msg_data["role"],
+            content=assistant_msg_data["content"],
+            agent_name=assistant_msg_data.get("agent"),
+            citations=assistant_msg_data.get("citations"),
+        )
         session["messages"].append(assistant_msg_data)
         
         # Update session
@@ -606,7 +637,7 @@ class ChatbotManager:
         Returns:
             List of messages
         """
-        messages = await self.firestore.get_session_messages(session_id)
+        messages = await self.firestore.get_messages(session_id)
         return messages
     
     async def close_session(self, session_id: str):
