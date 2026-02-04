@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     # -------------------------------------------------------------------------
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.0-flash"
+    use_vertex_ai: bool = False
     
     # -------------------------------------------------------------------------
     # Google Cloud Project Configuration
@@ -84,13 +85,15 @@ def get_gemini_api_key() -> str:
         str: The Gemini API key
         
     Raises:
-        ValueError: If the API key is not configured
+        ValueError: If the API key is not configured and not using Vertex AI
     """
     settings = get_settings()
+    if settings.use_vertex_ai:
+        return ""
     if not settings.gemini_api_key:
         raise ValueError(
             "Missing required environment variable: GEMINI_API_KEY. "
-            "Please set it in your .env file or environment."
+            "Please set it in your .env file or set USE_VERTEX_AI=true."
         )
     return settings.gemini_api_key
 
