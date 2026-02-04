@@ -1,0 +1,39 @@
+steps:
+  # Step 1: Install dependencies
+  - name: 'gcr.io/cloud-builders/npm'
+    args:
+      - 'install'
+    dir: 'frontend'
+    env:
+      - 'npm_config_loglevel=warn'
+
+  # Step 2: Build Next.js application
+  - name: 'gcr.io/cloud-builders/npm'
+    args:
+      - 'run'
+      - 'build'
+    dir: 'frontend'
+    env:
+      - 'NEXT_PUBLIC_API_URL=https://legalmind-backend-$PROJECT_ID.cloudfunctions.net'
+      - 'NODE_ENV=production'
+
+  # Step 3: Deploy to Firebase Hosting
+  - name: 'gcr.io/cloud-builders/firebase'
+    args:
+      - 'deploy'
+      - '--project=$PROJECT_ID'
+      - '--only=hosting'
+    env:
+      - 'FIREBASE_TOKEN=${_FIREBASE_TOKEN}'
+
+options:
+  machineType: 'N1_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY
+
+substitutions:
+  _FIREBASE_TOKEN: ''  # Set this via Cloud Build secrets
+
+availableSecrets:
+  secretManager:
+    - versionName: projects/$PROJECT_ID/secrets/firebase-token/versions/latest
+      env: FIREBASE_TOKEN
