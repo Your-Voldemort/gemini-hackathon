@@ -9,8 +9,61 @@ from typing import Dict, List, Any, Optional, Callable
 import json
 import asyncio
 from functools import lru_cache
+import warnings
 
 from config.settings import get_settings, get_gemini_api_key
+
+
+# Suppress the deprecation warning for google.generativeai
+warnings.filterwarnings('ignore', category=FutureWarning, module='google.generativeai')
+
+
+# ============================================================================
+# SDK Version Detection & Compatibility Helpers
+# ============================================================================
+
+def _get_vertex_sdk_version():
+    """Detect if required Vertex AI classes are available."""
+    try:
+        from vertexai.generative_models import Schema, Type, Tool, FunctionDeclaration, GenerativeModel, GenerationConfig
+        return "full"
+    except ImportError:
+        try:
+            from vertexai.generative_models import GenerativeModel, GenerationConfig
+            return "partial"
+        except ImportError:
+            return "unavailable"
+
+
+def _safely_import_vertex_class(class_name: str):
+    """Safely import a Vertex AI class with fallback."""
+    try:
+        if class_name == "Schema":
+            from vertexai.generative_models import Schema
+            return Schema
+        elif class_name == "Type":
+            from vertexai.generative_models import Type
+            return Type
+        elif class_name == "Tool":
+            from vertexai.generative_models import Tool
+            return Tool
+        elif class_name == "FunctionDeclaration":
+            from vertexai.generative_models import FunctionDeclaration
+            return FunctionDeclaration
+        elif class_name == "GenerativeModel":
+            from vertexai.generative_models import GenerativeModel
+            return GenerativeModel
+        elif class_name == "GenerationConfig":
+            from vertexai.generative_models import GenerationConfig
+            return GenerationConfig
+        elif class_name == "GoogleSearchRetrieval":
+            from vertexai.generative_models import GoogleSearchRetrieval
+            return GoogleSearchRetrieval
+        elif class_name == "Part":
+            from vertexai.generative_models import Part
+            return Part
+    except ImportError:
+        return None
 
 
 def _convert_json_schema_to_gemini(schema: Dict[str, Any]) -> Dict[str, Any]:
@@ -63,9 +116,10 @@ def _convert_json_schema_to_vertex(schema: Dict[str, Any]):
     if not isinstance(schema, dict):
         return schema
 
-    try:
-        from vertexai.generative_models import Schema, Type
-    except ImportError:
+    Schema = _safely_import_vertex_class("Schema")
+    Type = _safely_import_vertex_class("Type")
+    
+    if Schema is None or Type is None:
         return None
 
     type_mapping = {
@@ -77,52 +131,61 @@ def _convert_json_schema_to_vertex(schema: Dict[str, Any]):
         "array": Type.ARRAY,
     }
 
-    schema_type = type_mapping.get(schema.get("type", "string"), Type.STRING)
-    properties = None
-    items = None
+    try:
+        schema_type = type_mapping.get(schema.get("type", "string"), Type.STRING)
+        properties = None
+        items = None
 
-    if schema.get("properties") and isinstance(schema["properties"], dict):
-        properties = {
-            k: _convert_json_schema_to_vertex(v)
-            for k, v in schema["properties"].items()
-        }
+        if schema.get("properties") and isinstance(schema["properties"], dict):
+            properties = {
+                k: _convert_json_schema_to_vertex(v)
+                for k, v in schema["properties"].items()
+            }
 
-    if schema.get("items") and isinstance(schema["items"], dict):
-        items = _convert_json_schema_to_vertex(schema["items"])
+        if schema.get("items") and isinstance(schema["items"], dict):
+            items = _convert_json_schema_to_vertex(schema["items"])
 
-    return Schema(
-        type_=schema_type,
-        description=schema.get("description"),
-        properties=properties,
-        items=items,
-        required=schema.get("required"),
-        enum=schema.get("enum"),
-    )
+        return Schema(
+            type_=schema_type,
+            description=schema.get("description"),
+            properties=properties,
+            items=items,
+            required=schema.get("required"),
+            enum=schema.get("enum"),
+        )
+    except Exception as e:
+        print(f"⚠️ Error converting schema for Vertex AI: {e}")
+        return None
 
 
 def _build_vertex_tools(tools: List[Dict[str, Any]]):
     """Build Vertex AI Tool objects from tool definitions."""
-    try:
-        from vertexai.generative_models import Tool, FunctionDeclaration
-    except ImportError:
+    Tool = _safely_import_vertex_class("Tool")
+    FunctionDeclaration = _safely_import_vertex_class("FunctionDeclaration")
+    
+    if Tool is None or FunctionDeclaration is None:
         return []
 
-    vertex_tools = []
-    for tool in tools:
-        parameters = None
-        if "parameters" in tool:
-            parameters = _convert_json_schema_to_vertex(tool["parameters"])
-            if parameters is None:
-                return []
+    try:
+        vertex_tools = []
+        for tool in tools:
+            parameters = None
+            if "parameters" in tool:
+                parameters = _convert_json_schema_to_vertex(tool["parameters"])
+                if parameters is None:
+                    return []
 
-        func_decl = FunctionDeclaration(
-            name=tool["name"],
-            description=tool.get("description"),
-            parameters=parameters,
-        )
-        vertex_tools.append(Tool(function_declarations=[func_decl]))
+            func_decl = FunctionDeclaration(
+                name=tool["name"],
+                description=tool.get("description"),
+                parameters=parameters,
+            )
+            vertex_tools.append(Tool(function_declarations=[func_decl]))
 
-    return vertex_tools
+        return vertex_tools
+    except Exception as e:
+        print(f"⚠️ Error building Vertex AI tools: {e}")
+        return []
 
 
 class GeminiService:
@@ -140,14 +203,28 @@ class GeminiService:
     def _configure_api(self):
         """Configure the Gemini API with credentials."""
         if self.settings.use_vertex_ai:
-            import vertexai
-            vertexai.init(project=self.settings.google_cloud_project, location="us-central1")
-            print(f"✅ Using Vertex AI (project: {self.settings.google_cloud_project})")
+            try:
+                import vertexai
+                print(f"Initializing Vertex AI (project: {self.settings.google_cloud_project})...")
+                vertexai.init(project=self.settings.google_cloud_project, location="us-central1")
+                print(f"✅ Using Vertex AI (project: {self.settings.google_cloud_project})")
+            except Exception as e:
+                print(f"⚠️ Vertex AI init failed: {e}")
+                print("⚠️ Falling back to AI Studio (if API key is available)")
+                self.settings.use_vertex_ai = False
+                api_key = get_gemini_api_key()
+                if api_key:
+                    genai.configure(api_key=api_key)
+                    print("✅ Using AI Studio with API key")
+                else:
+                    print("⚠️ No credentials available - API calls will fail")
         else:
             api_key = get_gemini_api_key()
             if api_key:
                 genai.configure(api_key=api_key)
                 print("✅ Using AI Studio with API key")
+            else:
+                print("⚠️ No API key provided - using Vertex AI defaults")
     
     @property
     def model(self):
@@ -176,27 +253,38 @@ class GeminiService:
             
             # Add Google Search grounding if enabled
             if self.settings.enable_search_grounding:
+                google_search = None
                 if self.use_vertex:
-                    from vertexai.generative_models import Tool
-                    google_search = Tool.from_google_search_retrieval()
+                    try:
+                        Tool = _safely_import_vertex_class("Tool")
+                        GoogleSearchRetrieval = _safely_import_vertex_class("GoogleSearchRetrieval")
+                        if Tool and GoogleSearchRetrieval:
+                            google_search = Tool(google_search_retrieval=GoogleSearchRetrieval())
+                    except Exception as e:
+                        print(f"⚠️ GoogleSearchRetrieval not available: {e}")
                 else:
-                    from google.generativeai.types import Tool
-                    google_search = Tool.from_google_search_retrieval()
+                    try:
+                        from google.generativeai.types import Tool
+                        google_search = Tool.from_google_search_retrieval()
+                    except Exception as e:
+                        print(f"⚠️ Google Search not available in AI Studio: {e}")
 
-                if "tools" in model_kwargs:
-                    model_kwargs["tools"].append(google_search)
-                else:
-                    model_kwargs["tools"] = [google_search]
+                if google_search:
+                    if "tools" in model_kwargs:
+                        model_kwargs["tools"].append(google_search)
+                    else:
+                        model_kwargs["tools"] = [google_search]
             
             if self.use_vertex:
-                from vertexai.generative_models import GenerativeModel
-                self._model = GenerativeModel(**model_kwargs)
-            else:
-                if self.use_vertex:
-                    from vertexai.generative_models import GenerativeModel
+                GenerativeModel = _safely_import_vertex_class("GenerativeModel")
+                if GenerativeModel:
                     self._model = GenerativeModel(**model_kwargs)
                 else:
+                    print("⚠️ Vertex AI GenerativeModel not available, falling back to AI Studio")
+                    self.use_vertex = False
                     self._model = genai.GenerativeModel(**model_kwargs)
+            else:
+                self._model = genai.GenerativeModel(**model_kwargs)
         
         return self._model
     
@@ -265,13 +353,20 @@ class GeminiService:
             # Create model with custom system instruction if provided
             if system_instruction:
                 if self.use_vertex:
-                    from vertexai.generative_models import GenerativeModel
-                    tools = _build_vertex_tools(self._tool_declarations) if self._tool_declarations else None
-                    model = GenerativeModel(
-                        model_name=self.settings.gemini_model,
-                        system_instruction=system_instruction,
-                        tools=tools,
-                    )
+                    GenerativeModel = _safely_import_vertex_class("GenerativeModel")
+                    if GenerativeModel:
+                        tools = _build_vertex_tools(self._tool_declarations) if self._tool_declarations else None
+                        model = GenerativeModel(
+                            model_name=self.settings.gemini_model,
+                            system_instruction=system_instruction,
+                            tools=tools,
+                        )
+                    else:
+                        model = genai.GenerativeModel(
+                            model_name=self.settings.gemini_model,
+                            system_instruction=system_instruction,
+                            tools=self._tool_declarations if self._tool_declarations else None,
+                        )
                 else:
                     model = genai.GenerativeModel(
                         model_name=self.settings.gemini_model,
@@ -285,8 +380,9 @@ class GeminiService:
             gen_config = None
             if temperature is not None:
                 if self.use_vertex:
-                    from vertexai.generative_models import GenerationConfig
-                    gen_config = GenerationConfig(temperature=temperature)
+                    GenerationConfig = _safely_import_vertex_class("GenerationConfig")
+                    if GenerationConfig:
+                        gen_config = GenerationConfig(temperature=temperature)
                 else:
                     gen_config = genai.GenerationConfig(temperature=temperature)
             
@@ -349,12 +445,35 @@ class GeminiService:
                         )
                         
                         # Send function result back to model
-                        function_response = genai.protos.Part(
-                            function_response=genai.protos.FunctionResponse(
-                                name=function_name,
-                                response={"result": json.dumps(tool_result)}
-                            )
-                        )
+                        try:
+                            if self.use_vertex:
+                                Part = _safely_import_vertex_class("Part")
+                                if Part:
+                                    from vertexai.generative_models import FunctionResponse
+                                    function_response = Part(
+                                        function_response=FunctionResponse(
+                                            name=function_name,
+                                            response={"result": json.dumps(tool_result)}
+                                        )
+                                    )
+                                else:
+                                    # Fallback to AI Studio
+                                    function_response = genai.protos.Part(
+                                        function_response=genai.protos.FunctionResponse(
+                                            name=function_name,
+                                            response={"result": json.dumps(tool_result)}
+                                        )
+                                    )
+                            else:
+                                function_response = genai.protos.Part(
+                                    function_response=genai.protos.FunctionResponse(
+                                        name=function_name,
+                                        response={"result": json.dumps(tool_result)}
+                                    )
+                                )
+                        except Exception as e:
+                            print(f"⚠️ Error creating function response: {e}")
+                            continue
                         
                         # Get follow-up response
                         follow_up = await asyncio.to_thread(
@@ -503,10 +622,15 @@ class GeminiService:
         try:
             # Build generation config using appropriate SDK
             if self.use_vertex:
-                from vertexai.generative_models import GenerationConfig
-                gen_config = GenerationConfig(
-                    temperature=temperature if temperature is not None else 0.7,
-                )
+                GenerationConfig = _safely_import_vertex_class("GenerationConfig")
+                if GenerationConfig:
+                    gen_config = GenerationConfig(
+                        temperature=temperature if temperature is not None else 0.7,
+                    )
+                else:
+                    gen_config = genai.GenerationConfig(
+                        temperature=temperature if temperature is not None else 0.7,
+                    )
             else:
                 gen_config = genai.GenerationConfig(
                     temperature=temperature if temperature is not None else 0.7,
@@ -538,18 +662,30 @@ class GeminiService:
             
             if use_search_grounding:
                 if self.use_vertex:
-                    from vertexai.generative_models import Tool
+                    try:
+                        Tool = _safely_import_vertex_class("Tool")
+                        GoogleSearchRetrieval = _safely_import_vertex_class("GoogleSearchRetrieval")
+                        if Tool and GoogleSearchRetrieval:
+                            model_tools.append(Tool(google_search_retrieval=GoogleSearchRetrieval()))
+                    except Exception as e:
+                        print(f"⚠️ GoogleSearchRetrieval not available: {e}")
                 else:
-                    from google.generativeai.types import Tool
-                model_tools.append(Tool.from_google_search_retrieval())
+                    try:
+                        from google.generativeai.types import Tool
+                        model_tools.append(Tool.from_google_search_retrieval())
+                    except Exception as e:
+                        print(f"⚠️ Google Search not available: {e}")
             
             if model_tools:
                 model_kwargs["tools"] = model_tools
             
             # Use appropriate SDK based on configuration
             if self.use_vertex:
-                from vertexai.generative_models import GenerativeModel
-                model = GenerativeModel(**model_kwargs)
+                GenerativeModel = _safely_import_vertex_class("GenerativeModel")
+                if GenerativeModel:
+                    model = GenerativeModel(**model_kwargs)
+                else:
+                    model = genai.GenerativeModel(**model_kwargs)
             else:
                 model = genai.GenerativeModel(**model_kwargs)
             
