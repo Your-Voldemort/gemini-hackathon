@@ -4,8 +4,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const id = (await params).id;
     const apiUrl = `http://localhost:8000/api/chat/session/${id}`;
+    const apiKey = process.env.BACKEND_API_KEY;
 
-    const response = await fetch(apiUrl);
+    const response = await fetch(apiUrl, {
+      headers: {
+        ...(apiKey ? { 'X-API-Key': apiKey } : {}),
+      },
+    });
     const data = await response.json();
 
     if (!response.ok || data?.success === false) {
