@@ -247,7 +247,7 @@ async def create_session(http_request: Request):
 
 
 @router.get("/chat/session/{session_id}")
-async def get_session(session_id: str):
+async def get_session(session_id: str, limit: int = 100):
     """Get session information and history.
     
     Args:
@@ -258,7 +258,7 @@ async def get_session(session_id: str):
     """
     try:
         chatbot = get_chatbot_manager()
-        history = await chatbot.get_session_history(session_id)
+        history = await chatbot.get_session_history(session_id, limit=limit)
         
         firestore = FirestoreService()
         session = await firestore.get_session(session_id)
@@ -296,7 +296,7 @@ async def delete_session(session_id: str):
 
 
 @router.get("/chat/sessions")
-async def list_sessions():
+async def list_sessions(limit: int = 50):
     """List all active sessions.
     
     Returns:
@@ -304,14 +304,15 @@ async def list_sessions():
     """
     try:
         firestore = FirestoreService()
-        sessions = await firestore.list_sessions()
+        sessions = await firestore.list_sessions(limit=limit)
         
         return {
             "success": True,
             "sessions": sessions,
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Error listing sessions: %s", str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to fetch sessions. Please try again.")
 
 
 # =============================================================================
