@@ -13,6 +13,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from config.settings import get_settings
 from managers.chatbot_manager_new import get_chatbot_manager
 from api.endpoints_new import router
+from utils.error_handlers import (
+    api_error_handler,
+    validation_exception_handler,
+    general_exception_handler,
+    APIError,
+)
 
 
 @asynccontextmanager
@@ -88,38 +94,21 @@ app.add_middleware(
 app.include_router(router, prefix="/api")
 
 
-# Global exception handler for better error responses
+# Global exception handlers for better error responses
 from fastapi import Request
-from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 
 @app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    """Handle validation errors with user-friendly messages."""
-    return JSONResponse(
-        status_code=400,
-        content={
-            "success": False,
-            "error": "Invalid request format",
-            "details": str(exc),
-        },
-    )
+async def handle_validation_exception(request: Request, exc: RequestValidationError):
+    return await validation_exception_handler(request, exc)
+
+@app.exception_handler(APIError)
+async def handle_api_error(request: Request, exc: APIError):
+    return await api_error_handler(request, exc)
 
 @app.exception_handler(Exception)
-async def general_exception_handler(request: Request, exc: Exception):
-    """Handle unexpected errors with user-friendly messages."""
-    print(f"Unhandled exception: {exc}")
-    import traceback
-    traceback.print_exc()
-    
-    return JSONResponse(
-        status_code=500,
-        content={
-            "success": False,
-            "error": "An unexpected error occurred. Please try again later.",
-            "details": str(exc) if hasattr(exc, '__str__') else "Unknown error",
-        },
-    )
+async def handle_general_exception(request: Request, exc: Exception):
+    return await general_exception_handler(request, exc)
 
 
 # WebSocket endpoint for real-time chat
