@@ -2,7 +2,12 @@ import { NextResponse } from 'next/server';
 
 export async function GET() {
   try {
-    const response = await fetch('http://localhost:8000/api/chat/sessions');
+    const apiKey = process.env.BACKEND_API_KEY;
+    const response = await fetch('http://localhost:8000/api/chat/sessions', {
+      headers: {
+        ...(apiKey ? { 'X-API-Key': apiKey } : {}),
+      },
+    });
     const data = await response.json();
 
     if (!response.ok || data?.success === false) {
