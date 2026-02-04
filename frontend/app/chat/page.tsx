@@ -75,11 +75,12 @@ export default function ChatPage() {
     e.preventDefault();
     if (!input.trim() || isGenerating) return;
 
+    const messageText = input.trim();
     // Add user message
     const userMessage = {
       id: Date.now().toString(),
       role: 'user',
-      content: input.trim(),
+      content: messageText,
     };
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
@@ -92,28 +93,41 @@ export default function ChatPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message: input.trim(),
+          message: messageText,
           session_id: sessionId,
         }),
       });
 
+      if (!response.ok) {
+        // Handle HTTP errors
+        const errorData = await response.json();
+        const errorMessage = {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: `Error: ${errorData.detail || response.statusText}`,
+        };
+        setMessages((prev) => [...prev, errorMessage]);
+        setIsGenerating(false);
+        return;
+      }
+
       const data = await response.json();
 
-      if (data.status === 'success') {
+      if (data.success) {
         // Store the session ID for future messages
         if (data.session_id) {
           setSessionId(data.session_id);
         }
 
-        // Add bot response
+        // Add bot response - use 'message' field, not 'response'
         const botMessage = {
           id: data.session_id || Date.now().toString(),
           role: 'assistant',
-          content: data.response,
+          content: data.message || 'No response received',
         };
         setMessages((prev) => [...prev, botMessage]);
       } else {
-        // Handle error
+        // Handle API error response
         const errorMessage = {
           id: Date.now().toString(),
           role: 'assistant',
