@@ -137,10 +137,12 @@ def _get_cache_key(request: ChatMessage) -> str:
     return f"{request.session_id}:{request.contract_id or ''}:{request.message.strip()}"
 
 
-def _get_cached_response(cache_key: str, ttl_seconds: int = 30) -> Optional[Dict[str, Any]]:
+def _get_cached_response(cache_key: str, ttl_seconds: Optional[int] = None) -> Optional[Dict[str, Any]]:
     entry = _response_cache.get(cache_key)
     if not entry:
         return None
+    if ttl_seconds is None:
+        ttl_seconds = get_settings().response_cache_ttl_seconds
     if datetime.utcnow().timestamp() - entry["ts"] > ttl_seconds:
         _response_cache.pop(cache_key, None)
         return None
