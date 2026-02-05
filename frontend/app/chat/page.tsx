@@ -18,6 +18,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { LoadingState } from '@/components/ui/loading-state';
 import { getErrorMessage } from '@/lib/error-messages';
 
+const apiBase = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+
 interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -79,7 +81,7 @@ export default function ChatPage() {
 
     const messageText = input.trim();
     // Add user message
-    const userMessage = {
+    const userMessage: ChatMessage = {
       id: Date.now().toString(),
       role: 'user',
       content: messageText,
@@ -93,7 +95,7 @@ export default function ChatPage() {
         setTimeout(() => reject(new Error('Request timeout')), 35000)
       );
 
-      const fetchPromise = fetch('/api/chat', {
+      const fetchPromise = fetch(`${apiBase}/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -109,7 +111,7 @@ export default function ChatPage() {
       if (!response.ok) {
         const errorData = await response.json();
         const errorText = getErrorMessage(response.status, errorData?.error || errorData?.detail);
-        const errorMessage = {
+        const errorMessage: ChatMessage = {
           id: Date.now().toString(),
           role: 'assistant',
           content: `❌ Error: ${errorText}`,
@@ -126,14 +128,14 @@ export default function ChatPage() {
           setSessionId(data.session_id);
         }
 
-        const botMessage = {
+        const botMessage: ChatMessage = {
           id: data.session_id || Date.now().toString(),
           role: 'assistant',
           content: data.message || 'No response received',
         };
         setMessages((prev) => [...prev, botMessage]);
       } else {
-        const errorMessage = {
+        const errorMessage: ChatMessage = {
           id: Date.now().toString(),
           role: 'assistant',
           content: `❌ Error: ${data.error || 'Something went wrong'}`,
@@ -147,7 +149,7 @@ export default function ChatPage() {
         ? 'Request took too long. Try a shorter message or simpler query.'
         : 'Failed to connect to the server. Please check your connection and try again.';
 
-      const errorMessage = {
+      const errorMessage: ChatMessage = {
         id: Date.now().toString(),
         role: 'assistant',
         content: `❌ Error: ${friendlyMessage}`,
@@ -183,7 +185,7 @@ export default function ChatPage() {
   const loadSession = async (id: string) => {
     console.log('Loading session:', id);
     try {
-      const response = await fetch(`/api/chat/${id}`);
+      const response = await fetch(`${apiBase}/chat/session/${id}`);
       const data = await response.json();
       console.log('Session data:', data);
 
