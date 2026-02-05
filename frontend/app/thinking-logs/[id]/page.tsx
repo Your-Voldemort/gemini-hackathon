@@ -238,7 +238,9 @@ export default function ThinkingLogPage() {
                     {conversation.agents.map((agent: any, agentIndex: number) => (
                       <motion.div
                         key={`${conversation.conversation_id}-${agent.agent_name}`}
-                        ref={(el) => (agentRefs.current[`${conversation.conversation_id}-${agent.agent_name}`] = el)}
+                        ref={(el) => {
+                          agentRefs.current[`${conversation.conversation_id}-${agent.agent_name}`] = el;
+                        }}
                         className={`bg-card text-card-foreground rounded-xl shadow-sm w-[60%] mb-20 ${
                           agentIndex % 2 === 0 ? 'self-start' : 'self-end'
                         }`}
