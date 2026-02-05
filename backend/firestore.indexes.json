@@ -29,16 +29,6 @@
       ]
     },
     {
-      "collectionGroup": "sessions",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "last_activity",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
       "collectionGroup": "contracts",
       "queryScope": "COLLECTION",
       "fields": [
