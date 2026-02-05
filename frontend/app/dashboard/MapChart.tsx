@@ -11,7 +11,7 @@ const seaCountriesColors = {
   Singapore: '#DC143C', // Crimson
 };
 
-const MapChart = ({ setTooltipContent, sliderValue }) => {
+const MapChart = ({ setTooltipContent, sliderValue }: any) => {
   return (
     <div>
       <ComposableMap>
@@ -32,8 +32,8 @@ const MapChart = ({ setTooltipContent, sliderValue }) => {
                   style={{
                     default: {
                       fill:
-                        sliderValue[0] === 20 && seaCountriesColors[geo.properties.name]
-                          ? seaCountriesColors[geo.properties.name]
+                        sliderValue[0] === 20 && seaCountriesColors[geo.properties.name as keyof typeof seaCountriesColors]
+                          ? seaCountriesColors[geo.properties.name as keyof typeof seaCountriesColors]
                           : '#D6D6DA',
                       outline: 'none',
                     },
