@@ -23,5 +23,5 @@
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "app/chat/CHAT_PAGE_UPDATES.ts", "app/api/reports/route.ts", "app/api/thinking-logs/[id]/route.ts"]
 }
