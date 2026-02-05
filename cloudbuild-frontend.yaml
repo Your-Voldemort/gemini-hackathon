@@ -14,7 +14,7 @@ steps:
       - 'build'
     dir: 'frontend'
     env:
-      - 'NEXT_PUBLIC_API_URL=https://legalmind-backend-$PROJECT_ID.cloudfunctions.net'
+      - 'NEXT_PUBLIC_API_URL=https://legalmind-backend-677928716377.us-central1.run.app'
       - 'NODE_ENV=production'
 
   # Step 3: Deploy to Firebase Hosting
