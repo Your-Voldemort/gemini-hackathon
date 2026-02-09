@@ -23,8 +23,8 @@ EXPOSE 8000
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
-ENV PORT=8000
 ENV USE_VERTEX_AI=true
+# Note: PORT is set by Cloud Run (8080), don't override it here
 
 # Run the application
 CMD ["python", "main_new.py"]
