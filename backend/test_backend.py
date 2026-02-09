@@ -122,10 +122,10 @@ def test_settings():
         else:
             log_test("Settings has google_cloud_project", "WARN", "google_cloud_project not set (requires .env)")
         
-        if hasattr(settings, 'gemini_api_key'):
-            log_test("Settings has gemini_api_key", "PASS")
+        if hasattr(settings, 'gemini_model'):
+            log_test("Settings has gemini_model", "PASS")
         else:
-            log_test("Settings has gemini_api_key", "WARN", "gemini_api_key not set (requires .env)")
+            log_test("Settings has gemini_model", "WARN", "gemini_model not set (requires .env)")
         
         return True
     except Exception as e:
