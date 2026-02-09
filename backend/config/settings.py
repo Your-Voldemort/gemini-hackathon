@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     # -------------------------------------------------------------------------
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.0-flash"
-    use_vertex_ai: bool = False
+    use_vertex_ai: bool = True  # Default to Vertex AI for production (Cloud Run has proper credentials)
     
     # -------------------------------------------------------------------------
     # Google Cloud Project Configuration
@@ -74,8 +74,8 @@ class Settings(BaseSettings):
     @classmethod
     def validate_api_key(cls, v, info):
         """Validate API key is set if not using Vertex AI."""
-        # Check if using Vertex AI from environment
-        use_vertex_ai = os.getenv("USE_VERTEX_AI", "false").lower() == "true"
+        # Check if using Vertex AI from environment (default to true for production)
+        use_vertex_ai = os.getenv("USE_VERTEX_AI", "true").lower() == "true"
         if not use_vertex_ai and not v:
             # Only warn, don't fail - Vertex AI might use ADC
             print("⚠️ GEMINI_API_KEY not set - will attempt Vertex AI or ADC authentication")
