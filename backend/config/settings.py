@@ -5,6 +5,7 @@ Google Cloud / Vertex AI Configuration
 
 import os
 from typing import Optional
+from pathlib import Path
 from pydantic_settings import BaseSettings
 from pydantic import field_validator, Field
 from functools import lru_cache
@@ -79,14 +80,14 @@ class Settings(BaseSettings):
             )
         return v
     
-    class Config:
-        env_file = ".env.local"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
-        # Extra config to ensure environment variables are read
-        extra = "allow"
-        # Populate from environment variables even if defaults are set
-        validate_assignment = True
+    model_config = {
+        "env_file": str(Path(__file__).parent.parent / ".env.local"),
+        "env_file_encoding": "utf-8",
+        "case_sensitive": False,
+        "extra": "allow",
+        "validate_assignment": True,
+    }
+
 
 
 @lru_cache()

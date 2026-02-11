@@ -1,15 +1,19 @@
 """
 LegalMind Backend Entry Point
-Run with: python main_new.py
+Run with: python main.py
 """
 
 import uvicorn
 from dotenv import load_dotenv
 import os
+from pathlib import Path
+
+# Get the backend directory
+backend_dir = Path(__file__).parent
 
 # Load environment variables from .env.local first, then .env
-load_dotenv(".env.local")
-load_dotenv(".env")
+load_dotenv(backend_dir / ".env.local")
+load_dotenv(backend_dir / ".env")
 
 
 def main():
@@ -31,7 +35,7 @@ def main():
     print("=" * 60)
     
     uvicorn.run(
-        "api.app:app",
+        "api.app_new:app",
         host="0.0.0.0",
         port=port,
         reload=settings.debug,

@@ -20,12 +20,9 @@ export function SiteHeader() {
     <header className="sticky top-0 z-50 w-full border-b bg-background text-foreground">
       <div className="flex h-16 items-center justify-between mx-6">
         <Link href="/chat" className="flex items-center gap-2" prefetch={false}>
-          <Image src="/assets/image.jpeg"
-            alt="LegalMind Logo"
-            width={40}
-            height={40}
-            className="rounded-lg"
-          />
+          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg">
+            ⚖️
+          </div>
           <span className="font-semibold text-primary">LegalMind</span>
         </Link>
         <nav className="hidden items-center gap-6 text-sm font-medium md:flex">

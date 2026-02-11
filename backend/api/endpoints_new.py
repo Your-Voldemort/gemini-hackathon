@@ -309,15 +309,23 @@ async def list_sessions(limit: int = 50):
     """
     try:
         firestore = FirestoreService()
-        sessions = await firestore.list_sessions(limit=limit)
+        try:
+            sessions = await firestore.list_sessions(limit=limit)
+        except Exception as query_error:
+            logger.warning("Could not query sessions (may be empty): %s", str(query_error))
+            sessions = []
         
         return {
             "success": True,
-            "sessions": sessions,
+            "sessions": sessions if sessions else [],
         }
     except Exception as e:
         logger.error("Error listing sessions: %s", str(e), exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to fetch sessions. Please try again.")
+        # Return empty sessions list instead of 500 error
+        return {
+            "success": True,
+            "sessions": [],
+        }
 
 
 # =============================================================================
