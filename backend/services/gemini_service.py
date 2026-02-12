@@ -10,11 +10,14 @@ from vertexai.generative_models import (
     GenerationConfig,
     Tool,
     FunctionDeclaration,
-    Schema,
     Type,
     GoogleSearchRetrieval,
     Part,
 )
+try:
+    from vertexai.generative_models import Schema
+except ImportError:
+    from vertexai.generative_models.types import Schema
 from typing import Dict, List, Any, Optional, Callable
 import json
 import asyncio
